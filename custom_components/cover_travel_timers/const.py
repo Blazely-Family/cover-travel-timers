@@ -1,6 +1,7 @@
 """Constants for Cover Travel Timers."""
 
 from enum import StrEnum
+from typing import NamedTuple
 
 DOMAIN = "cover_travel_timers"
 
@@ -22,6 +23,26 @@ DEFAULTS: dict[str, float] = {
     CONF_CLOSE_MARGIN: 5.0,
     CONF_CLOSED_SETTLE: 0.0,
 }
+
+
+class Tunable(NamedTuple):
+    """One timing: its option key, range in seconds and icon."""
+
+    key: str
+    minimum: float
+    maximum: float
+    icon: str
+
+
+TUNABLES = (
+    Tunable(CONF_OPEN_TIME, 1, 300, "mdi:arrow-up-bold"),
+    Tunable(CONF_CLOSE_TIME, 1, 300, "mdi:arrow-down-bold"),
+    Tunable(CONF_SENSOR_OFFSET, 0, 30, "mdi:ray-start-arrow"),
+    Tunable(CONF_MOTOR_ALLOWANCE, 0, 30, "mdi:engine"),
+    Tunable(CONF_CLOSE_MARGIN, 0, 120, "mdi:timer-plus-outline"),
+    Tunable(CONF_CLOSED_SETTLE, 0, 30, "mdi:timer-sand"),
+)
+TUNABLE_STEP = 0.1
 
 # After a stop the controller ignores a pulse sent straight away, so the
 # door is left to settle this long before the next pulse counts.

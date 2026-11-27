@@ -30,6 +30,7 @@ def entry() -> MockConfigEntry:
     """A garage door with the default timings."""
     return MockConfigEntry(
         domain=DOMAIN,
+        version=2,
         title="Garage Travel",
         unique_id=SOURCE,
         data={CONF_SOURCE: SOURCE, CONF_CONTACT: CONTACT, CONF_DEVICE_CLASS: "garage"},

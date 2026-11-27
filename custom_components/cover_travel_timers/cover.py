@@ -34,20 +34,21 @@ async def async_setup_entry(
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Add the door's cover."""
-    async_add_entities([CoverTravelTimersCover(entry)])
+    async_add_entities([CoverTravelTimersCover(hass, entry)])
 
 
 class CoverTravelTimersCover(CoverTravelTimersEntity, CoverEntity, RestoreEntity):
     """Open/close/stop sent as pulses; position from the tracker."""
 
-    _attr_name = None
     _attr_supported_features = (
         CoverEntityFeature.OPEN | CoverEntityFeature.CLOSE | CoverEntityFeature.STOP
     )
 
-    def __init__(self, entry: CoverTravelTimersConfigEntry) -> None:
+    def __init__(
+        self, hass: HomeAssistant, entry: CoverTravelTimersConfigEntry
+    ) -> None:
         """Set up the cover."""
-        super().__init__(entry, "cover")
+        super().__init__(hass, entry, "cover")
         self._attr_device_class = CoverDeviceClass(entry.data[CONF_DEVICE_CLASS])
         self._refresh: CALLBACK_TYPE | None = None
 

@@ -18,7 +18,7 @@ async def async_setup_entry(
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Add the door's phase sensor."""
-    async_add_entities([CoverTravelTimersPhaseSensor(entry)])
+    async_add_entities([CoverTravelTimersPhaseSensor(hass, entry)])
 
 
 class CoverTravelTimersPhaseSensor(CoverTravelTimersEntity, SensorEntity):
@@ -28,9 +28,11 @@ class CoverTravelTimersPhaseSensor(CoverTravelTimersEntity, SensorEntity):
     _attr_options = [phase.value for phase in Phase]
     _attr_translation_key = "phase"
 
-    def __init__(self, entry: CoverTravelTimersConfigEntry) -> None:
+    def __init__(
+        self, hass: HomeAssistant, entry: CoverTravelTimersConfigEntry
+    ) -> None:
         """Set up the sensor."""
-        super().__init__(entry, "phase")
+        super().__init__(hass, entry, "phase", "Phase")
         self._kind = entry.data[CONF_DEVICE_CLASS]  # garage or gate
 
     @property
