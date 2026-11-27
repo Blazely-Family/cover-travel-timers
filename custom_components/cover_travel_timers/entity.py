@@ -3,10 +3,9 @@
 from __future__ import annotations
 
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, split_entity_id
 from homeassistant.helpers.device import async_entity_id_to_device
 from homeassistant.helpers.entity import Entity
-from homeassistant.util import slugify
 
 from .const import CONF_SOURCE
 from .tracker import DoorTracker
@@ -19,11 +18,12 @@ class CoverTravelTimersEntity(Entity):
     than a device of its own; with no such device it has none. Names carry the
     entry's title, since the device's own name is the pulse cover's.
 
-    New entities suggest their entity id from that name (Home Assistant takes
-    an entity_id set before the entity is added as its suggestion), so they
-    match the cover's, e.g. number.lower_garage_door_full_open_time, rather
-    than having the device's area and name put in front. Existing entities keep
-    the id in the entity registry.
+    New entities suggest their entity id from the pulse cover's, plus _timer
+    (Home Assistant takes an entity_id set before the entity is added as its
+    suggestion): cover.lower_garage gives cover.lower_garage_timer,
+    sensor.lower_garage_timer_phase and number.lower_garage_timer_<timing>.
+    These never clash with the pulse cover. Existing entities keep the id in
+    the entity registry.
     """
 
     _attr_has_entity_name = False
@@ -41,7 +41,11 @@ class CoverTravelTimersEntity(Entity):
         self.tracker: DoorTracker = entry.runtime_data
         self._attr_unique_id = f"{entry.entry_id}_{key}"
         self._attr_name = f"{entry.title} {name}" if name else entry.title
-        self.entity_id = f"{domain}.{slugify(self._attr_name)}"
+        source_object_id = split_entity_id(entry.data[CONF_SOURCE])[1]
+        object_id = (
+            f"{source_object_id}_timer_{key}" if name else f"{source_object_id}_timer"
+        )
+        self.entity_id = f"{domain}.{object_id}"
         self.device_entry = async_entity_id_to_device(hass, entry.data[CONF_SOURCE])
 
     async def async_added_to_hass(self) -> None:

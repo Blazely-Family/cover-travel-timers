@@ -22,12 +22,12 @@ from custom_components.cover_travel_timers.const import (
 from .conftest import CONTACT, COVER, PHASE, SOURCE, setup_door
 
 NUMBERS = [
-    "number.garage_travel_full_open_time",
-    "number.garage_travel_full_close_time",
-    "number.garage_travel_sensor_offset",
-    "number.garage_travel_motor_allowance",
-    "number.garage_travel_close_margin",
-    "number.garage_travel_closed_settle_time",
+    "number.garage_controller_timer_full_open_time",
+    "number.garage_controller_timer_full_close_time",
+    "number.garage_controller_timer_sensor_offset",
+    "number.garage_controller_timer_motor_allowance",
+    "number.garage_controller_timer_close_margin",
+    "number.garage_controller_timer_closed_settle_time",
 ]
 
 
@@ -67,7 +67,7 @@ async def test_entities_join_the_pulse_cover_device(
     assert {e.device_id for e in entities} == {source_device.id}
     # The id follows the door's name; HA puts the device name in front of the name.
     cover = next(e for e in entities if e.domain == "cover")
-    assert cover.entity_id == "cover.garage_travel"
+    assert cover.entity_id == COVER
     assert hass.states.get(cover.entity_id).name == "Garage controller Garage Travel"
     assert not dr.async_entries_for_config_entry(dr.async_get(hass), entry.entry_id)
     # The pulse cover's device is still only the controller's.
@@ -88,12 +88,14 @@ async def test_numbers_show_the_options(
 ) -> None:
     """Each number shows its timing, as a config entity in seconds."""
     await setup_door(hass, entry, "off")
-    state = hass.states.get("number.garage_travel_full_open_time")
+    state = hass.states.get("number.garage_controller_timer_full_open_time")
     assert float(state.state) == DEFAULTS[CONF_OPEN_TIME]
     assert state.attributes["unit_of_measurement"] == "s"
     assert state.attributes["mode"] == "box"
     assert state.attributes["step"] == 0.1
-    entity = er.async_get(hass).async_get("number.garage_travel_full_open_time")
+    entity = er.async_get(hass).async_get(
+        "number.garage_controller_timer_full_open_time"
+    )
     assert entity.entity_category == "config"
 
 
@@ -107,7 +109,10 @@ async def test_number_saves_to_the_options(
     await hass.services.async_call(
         "number",
         "set_value",
-        {ATTR_ENTITY_ID: "number.garage_travel_full_open_time", "value": 14.6},
+        {
+            ATTR_ENTITY_ID: "number.garage_controller_timer_full_open_time",
+            "value": 14.6,
+        },
         blocking=True,
     )
     await hass.async_block_till_done()
@@ -115,7 +120,10 @@ async def test_number_saves_to_the_options(
     assert entry.options[CONF_OPEN_TIME] == 14.6
     assert entry.runtime_data is tracker  # same tracker: not reloaded
     assert tracker.t_open == 14.6
-    assert float(hass.states.get("number.garage_travel_full_open_time").state) == 14.6
+    assert (
+        float(hass.states.get("number.garage_controller_timer_full_open_time").state)
+        == 14.6
+    )
 
 
 async def test_configure_updates_the_number(
@@ -128,7 +136,10 @@ async def test_configure_updates_the_number(
         result["flow_id"], {**DEFAULTS, CONF_OPEN_TIME: 16.2}
     )
     await hass.async_block_till_done()
-    assert float(hass.states.get("number.garage_travel_full_open_time").state) == 16.2
+    assert (
+        float(hass.states.get("number.garage_controller_timer_full_open_time").state)
+        == 16.2
+    )
 
 
 async def test_migrate_from_own_device(
@@ -152,8 +163,8 @@ async def test_migrate_from_own_device(
         name="Garage Travel",
     )
     for domain, key, object_id in (
-        ("cover", "cover", "garage_travel"),
-        ("sensor", "phase", "garage_travel_phase"),
+        ("cover", "cover", "garage_controller_timer"),
+        ("sensor", "phase", "garage_controller_timer_phase"),
     ):
         entity_reg.async_get_or_create(
             domain,
@@ -203,8 +214,8 @@ async def test_title_starting_with_the_device_name(
     assert hass.states.get(NUMBERS[0]).name == "Garage Travel Full open time"
 
 
-async def test_new_ids_follow_the_door_name(hass: HomeAssistant) -> None:
-    """Brand-new entities on a device in an area get ids from the door's name.
+async def test_new_ids_follow_the_pulse_cover(hass: HomeAssistant) -> None:
+    """Brand-new entities get ids from the pulse cover's, plus _timer.
 
     Like the lower garage: the controller's device is "Lower Garage", in the
     "Lower Garage" area, and the door is "Lower Garage Door".
@@ -243,17 +254,17 @@ async def test_new_ids_follow_the_door_name(hass: HomeAssistant) -> None:
 
     assert sorted(e.entity_id for e in our_entities(hass, entry)) == sorted(
         [
-            "cover.lower_garage_door",
-            "sensor.lower_garage_door_phase",
-            "number.lower_garage_door_full_open_time",
-            "number.lower_garage_door_full_close_time",
-            "number.lower_garage_door_sensor_offset",
-            "number.lower_garage_door_motor_allowance",
-            "number.lower_garage_door_close_margin",
-            "number.lower_garage_door_closed_settle_time",
+            "cover.lower_garage_timer",
+            "sensor.lower_garage_timer_phase",
+            "number.lower_garage_timer_full_open_time",
+            "number.lower_garage_timer_full_close_time",
+            "number.lower_garage_timer_sensor_offset",
+            "number.lower_garage_timer_motor_allowance",
+            "number.lower_garage_timer_close_margin",
+            "number.lower_garage_timer_closed_settle_time",
         ]
     )
-    state = hass.states.get("number.lower_garage_door_full_open_time")
+    state = hass.states.get("number.lower_garage_timer_full_open_time")
     assert state.name == "Lower Garage Door Full open time"
 
 
@@ -273,4 +284,4 @@ async def test_existing_ids_are_kept(
     assert await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
     assert hass.states.get("number.my_open_time") is not None
-    assert hass.states.get("number.garage_travel_full_open_time") is None
+    assert hass.states.get("number.garage_controller_timer_full_open_time") is None
