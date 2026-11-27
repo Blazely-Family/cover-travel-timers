@@ -18,37 +18,24 @@ from homeassistant.core import callback
 from homeassistant.helpers import selector
 
 from .const import (
-    CONF_CLOSE_MARGIN,
-    CONF_CLOSE_TIME,
-    CONF_CLOSED_SETTLE,
     CONF_CONTACT,
-    CONF_MOTOR_ALLOWANCE,
-    CONF_OPEN_TIME,
-    CONF_SENSOR_OFFSET,
     CONF_SOURCE,
     DEFAULTS,
     DOMAIN,
+    TUNABLE_STEP,
+    TUNABLES,
+    Tunable,
 )
 
 DEVICE_CLASSES = [CoverDeviceClass.GARAGE.value, CoverDeviceClass.GATE.value]
 
-# (key, max seconds)
-TUNABLES = (
-    (CONF_OPEN_TIME, 300),
-    (CONF_CLOSE_TIME, 300),
-    (CONF_SENSOR_OFFSET, 30),
-    (CONF_MOTOR_ALLOWANCE, 30),
-    (CONF_CLOSE_MARGIN, 120),
-    (CONF_CLOSED_SETTLE, 30),
-)
 
-
-def _seconds(maximum: float) -> selector.NumberSelector:
+def _seconds(tunable: Tunable) -> selector.NumberSelector:
     return selector.NumberSelector(
         selector.NumberSelectorConfig(
-            min=0,
-            max=maximum,
-            step=0.1,
+            min=tunable.minimum,
+            max=tunable.maximum,
+            step=TUNABLE_STEP,
             unit_of_measurement=UnitOfTime.SECONDS,
             mode=selector.NumberSelectorMode.BOX,
         )
@@ -58,8 +45,8 @@ def _seconds(maximum: float) -> selector.NumberSelector:
 def _tunables_schema(values: dict[str, Any]) -> vol.Schema:
     return vol.Schema(
         {
-            vol.Required(key, default=values.get(key, DEFAULTS[key])): _seconds(top)
-            for key, top in TUNABLES
+            vol.Required(t.key, default=values.get(t.key, DEFAULTS[t.key])): _seconds(t)
+            for t in TUNABLES
         }
     )
 
@@ -89,7 +76,7 @@ USER_SCHEMA = vol.Schema(
 class CoverTravelTimersConfigFlow(ConfigFlow, domain=DOMAIN):
     """Add a door."""
 
-    VERSION = 1
+    VERSION = 2  # 2: entities live on the pulse cover's device
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None

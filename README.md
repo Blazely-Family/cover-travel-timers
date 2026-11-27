@@ -4,18 +4,41 @@ A Home Assistant integration that tracks the position of a garage door or gate
 driven by a single-pulse controller that only reports closed / not closed.
 
 Many door controllers take one pulse to move: the first pulse starts the door,
-a pulse mid-travel stops it, and the next pulse reverses it. Their Home
-Assistant cover usually fakes "opening" and "closing" with a fixed timer and
-loses track after a mid-travel stop. Cover Travel Timers follows the door from what is
-known for sure:
+a pulse mid-travel stops it, and the next pulse reverses it. Cover Travel
+Timers follows the door from what is known for sure:
 
 - the pulses sent to the controller (`cover.open_cover` / `cover.close_cover`
   on its cover, from this integration or from anywhere else in Home Assistant)
 - the closed contact (a `binary_sensor` that is off when the door is closed)
 - a handful of timings you tune in the UI
 
-It adds a **cover** with a real position and opening/closing states, and a
-**phase** sensor.
+For each door it adds a **cover** with a position and opening/closing states, a
+**phase** sensor, and a **number** for each timing, all on the controller's own
+device.
+
+## When to use this vs your door integration's own travel timers
+
+Some door integrations already simulate travel from fixed timers. The UniFi
+Access integration, for example, has door open and close time settings that
+show its cover as opening or closing for that long after a command. For a door
+with no position sensor, or one you only ever run end to end, that is all you
+need.
+
+Cover Travel Timers is for pulse-driven doors that also have a closed contact,
+when you want the cover to keep track through:
+
+- **stop and reverse**: a pulse mid-travel stops the door, and the next pulse
+  sends it back the other way from where it stopped
+- **fob, remote or app starts** that Home Assistant didn't send, picked up from
+  the closed contact
+- **obstructed**: a closing run that never reaches the closed contact
+- **sub-second timing**, so runs aren't rounded to whole seconds
+- **a closed settle time**, for gates that report closed while still tensioning
+
+It takes its commands from your door integration's cover and adds a separate,
+timed cover beside it. Once you use the timed cover (and hide the original),
+the door integration's own timers no longer affect what you see. You can leave
+them as they are.
 
 ## How it tracks the door
 
@@ -45,7 +68,6 @@ It adds a **cover** with a real position and opening/closing states, and a
 - **After a restart** the contact is trusted first: closed if it is closed.
   Otherwise a door at rest keeps its last phase and position, a door that was
   opening is open, and anything else is open with an unknown position.
-- **Tunables** apply from the next run when you save them; nothing is reloaded.
 
 ## Install
 
@@ -65,15 +87,16 @@ Copy `custom_components/cover_travel_timers` into your Home Assistant
 
 1. **Settings → Devices & services → Add integration → Cover Travel Timers.**
 2. Fill in:
-   - **Name**: use a name that differs from the pulse cover's, so the entity
-     ids don't clash.
+   - **Name**: for example "Lower Garage Door". Use a name that differs from
+     the pulse cover's, so the two covers are easy to tell apart.
    - **Pulse cover**: the controller's cover whose open/close sends a pulse.
    - **Closed contact**: the binary sensor that is off when the door is closed.
    - **Type**: garage door or gate.
-3. Open the new entry's **Configure** to set the timings (seconds, decimals
-   allowed):
+3. Set the timings, either on the controller's device page (the numbers under
+   **Configuration**) or with the entry's **Configure** button. Both edit the
+   same values:
 
-| Option | Default | What it is |
+| Timing | Default | What it is |
 | --- | --- | --- |
 | Full open time | 15 | From a pulse at closed to fully open |
 | Full close time | 21 | From a pulse at fully open to the closed contact |
@@ -82,7 +105,26 @@ Copy `custom_components/cover_travel_timers` into your Home Assistant
 | Close margin | 5 | Added to every closing run before it is called obstructed |
 | Closed settle time | 0 | How long the contact must stay closed before the door counts as closed (raise it for a gate that reports closed while still tensioning) |
 
+All are in seconds, and decimals are allowed. A change applies from the door's
+next run, and nothing is reloaded, so a door that is moving keeps its state.
+
+4. Optionally hide the original cover (its entity settings → **Visible** off)
+   and use the timed one on your dashboards and in automations.
+
 Add one entry per door.
+
+## Device
+
+The entities join the pulse cover's existing device, the way Home Assistant's
+own helpers (such as *Change device type of a switch*) do, rather than creating
+a device of their own. If the pulse cover has no device, the entities have
+none either. Home Assistant shows the device's name in front of each entity's
+name, and drops the repeat when the door's name already starts with it. For
+example, a device "Lower Garage" with a door "Lower Garage Door" shows
+"Lower Garage Door" and "Lower Garage Door Phase".
+
+Upgrading from 0.1.0 moves the existing entities to the pulse cover's device,
+keeps their entity ids, and removes the integration's old device.
 
 ## Development
 

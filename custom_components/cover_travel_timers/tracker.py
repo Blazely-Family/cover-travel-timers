@@ -95,18 +95,25 @@ class DoorTracker:
 
     # Tunables, read live so option changes apply to the next run.
 
-    def _opt(self, key: str) -> float:
+    def option(self, key: str) -> float:
+        """One timing, s."""
         return float(self.options.get(key, DEFAULTS[key]))
+
+    @callback
+    def async_set_options(self, options: Mapping[str, Any]) -> None:
+        """Take new timings (from Configure or a number entity)."""
+        self.options = options
+        self._notify()
 
     @property
     def t_open(self) -> float:
         """Full open time, s."""
-        return max(self._opt(CONF_OPEN_TIME), 0.1)
+        return max(self.option(CONF_OPEN_TIME), 0.1)
 
     @property
     def t_close(self) -> float:
         """Full close time, s."""
-        return max(self._opt(CONF_CLOSE_TIME), 0.1)
+        return max(self.option(CONF_CLOSE_TIME), 0.1)
 
     # Position.
 
@@ -244,7 +251,7 @@ class DoorTracker:
         if new is None:
             return
         if new.state == STATE_OFF:
-            settle = self._opt(CONF_CLOSED_SETTLE)
+            settle = self.option(CONF_CLOSED_SETTLE)
             self._cancel_settle()
             if settle > 0:
                 self._settle_timer = async_call_later(
@@ -278,7 +285,7 @@ class DoorTracker:
     @callback
     def _left_closed(self) -> None:
         """Left closed with no pulse first (fob, app): a full open, backdated."""
-        offset = min(self._opt(CONF_SENSOR_OFFSET), self.t_open)
+        offset = min(self.option(CONF_SENSOR_OFFSET), self.t_open)
         self._run(Phase.OPENING, offset, self.t_open - offset)
 
     @callback
@@ -298,7 +305,7 @@ class DoorTracker:
             self._run(
                 Phase.CLOSING,
                 start,
-                self.t_close + self._opt(CONF_CLOSE_MARGIN),
+                self.t_close + self.option(CONF_CLOSE_MARGIN),
             )
         elif phase in MOVING:
             self._stop()
@@ -308,7 +315,7 @@ class DoorTracker:
             self._run(
                 Phase.OPENING,
                 start,
-                self.t_open - start + self._opt(CONF_MOTOR_ALLOWANCE),
+                self.t_open - start + self.option(CONF_MOTOR_ALLOWANCE),
             )
         # STOPPING: the controller doesn't take a pulse straight after a stop.
 
