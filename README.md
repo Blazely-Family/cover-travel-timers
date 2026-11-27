@@ -123,6 +123,11 @@ name, and drops the repeat when the door's name already starts with it. For
 example, a device "Lower Garage" with a door "Lower Garage Door" shows
 "Lower Garage Door" and "Lower Garage Door Phase".
 
+Entity ids come from the door's name alone, so they don't pick up the device's
+area or name: a door "Lower Garage Door" gets `cover.lower_garage_door`,
+`sensor.lower_garage_door_phase` and `number.lower_garage_door_full_open_time`
+and so on. An id you have already changed is kept.
+
 Upgrading from 0.1.0 moves the existing entities to the pulse cover's device,
 keeps their entity ids, and removes the integration's old device.
 

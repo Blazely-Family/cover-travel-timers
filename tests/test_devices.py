@@ -5,7 +5,11 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from homeassistant.const import ATTR_ENTITY_ID, CONF_DEVICE_CLASS
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers import device_registry as dr, entity_registry as er
+from homeassistant.helpers import (
+    area_registry as ar,
+    device_registry as dr,
+    entity_registry as er,
+)
 
 from custom_components.cover_travel_timers.const import (
     CONF_CONTACT,
@@ -61,9 +65,9 @@ async def test_entities_join_the_pulse_cover_device(
     entities = our_entities(hass, entry)
     assert len(entities) == 8  # cover, phase, six timings
     assert {e.device_id for e in entities} == {source_device.id}
-    # Home Assistant puts the device name in front of the id and the name.
+    # The id follows the door's name; HA puts the device name in front of the name.
     cover = next(e for e in entities if e.domain == "cover")
-    assert cover.entity_id == "cover.garage_controller_garage_travel"
+    assert cover.entity_id == "cover.garage_travel"
     assert hass.states.get(cover.entity_id).name == "Garage controller Garage Travel"
     assert not dr.async_entries_for_config_entry(dr.async_get(hass), entry.entry_id)
     # The pulse cover's device is still only the controller's.
@@ -197,3 +201,76 @@ async def test_title_starting_with_the_device_name(
     assert hass.states.get(COVER).name == "Garage Travel"
     assert hass.states.get(PHASE).name == "Garage Travel Phase"
     assert hass.states.get(NUMBERS[0]).name == "Garage Travel Full open time"
+
+
+async def test_new_ids_follow_the_door_name(hass: HomeAssistant) -> None:
+    """Brand-new entities on a device in an area get ids from the door's name.
+
+    Like the lower garage: the controller's device is "Lower Garage", in the
+    "Lower Garage" area, and the door is "Lower Garage Door".
+    """
+    area = ar.async_get(hass).async_create("Lower Garage")
+    controller = MockConfigEntry(domain="test")
+    controller.add_to_hass(hass)
+    device_reg = dr.async_get(hass)
+    device = device_reg.async_get_or_create(
+        config_entry_id=controller.entry_id,
+        identifiers={("test", "lower_garage")},
+        name="Lower Garage",
+    )
+    device_reg.async_update_device(device.id, area_id=area.id)
+    er.async_get(hass).async_get_or_create(
+        "cover",
+        "test",
+        "lower_garage",
+        suggested_object_id="lower_garage",
+        config_entry=controller,
+        device_id=device.id,
+    )
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        version=2,
+        title="Lower Garage Door",
+        unique_id="cover.lower_garage",
+        data={
+            CONF_SOURCE: "cover.lower_garage",
+            CONF_CONTACT: CONTACT,
+            CONF_DEVICE_CLASS: "garage",
+        },
+        options=dict(DEFAULTS),
+    )
+    await setup_door(hass, entry, "off")
+
+    assert sorted(e.entity_id for e in our_entities(hass, entry)) == sorted(
+        [
+            "cover.lower_garage_door",
+            "sensor.lower_garage_door_phase",
+            "number.lower_garage_door_full_open_time",
+            "number.lower_garage_door_full_close_time",
+            "number.lower_garage_door_sensor_offset",
+            "number.lower_garage_door_motor_allowance",
+            "number.lower_garage_door_close_margin",
+            "number.lower_garage_door_closed_settle_time",
+        ]
+    )
+    state = hass.states.get("number.lower_garage_door_full_open_time")
+    assert state.name == "Lower Garage Door Full open time"
+
+
+async def test_existing_ids_are_kept(
+    hass: HomeAssistant, entry: MockConfigEntry
+) -> None:
+    """An id already in the entity registry (e.g. renamed by the user) stays."""
+    entry.add_to_hass(hass)
+    er.async_get(hass).async_get_or_create(
+        "number",
+        DOMAIN,
+        f"{entry.entry_id}_{CONF_OPEN_TIME}",
+        suggested_object_id="my_open_time",
+        config_entry=entry,
+    )
+    hass.states.async_set(CONTACT, "off")
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    assert hass.states.get("number.my_open_time") is not None
+    assert hass.states.get("number.garage_travel_full_open_time") is None

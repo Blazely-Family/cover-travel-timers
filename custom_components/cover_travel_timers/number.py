@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
-from homeassistant.components.number import NumberEntity, NumberMode
+from homeassistant.components.number import (
+    DOMAIN as NUMBER_DOMAIN,
+    NumberEntity,
+    NumberMode,
+)
 from homeassistant.const import EntityCategory, UnitOfTime
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
@@ -57,7 +61,7 @@ class CoverTravelTimersNumber(CoverTravelTimersEntity, NumberEntity):
         tunable: Tunable,
     ) -> None:
         """Set up the number."""
-        super().__init__(hass, entry, tunable.key, NAMES[tunable.key])
+        super().__init__(hass, entry, NUMBER_DOMAIN, tunable.key, NAMES[tunable.key])
         self._entry = entry
         self._key = tunable.key
         self._attr_native_min_value = tunable.minimum

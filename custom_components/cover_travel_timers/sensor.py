@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
-from homeassistant.components.sensor import SensorDeviceClass, SensorEntity
+from homeassistant.components.sensor import (
+    DOMAIN as SENSOR_DOMAIN,
+    SensorDeviceClass,
+    SensorEntity,
+)
 from homeassistant.const import CONF_DEVICE_CLASS
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
@@ -32,7 +36,7 @@ class CoverTravelTimersPhaseSensor(CoverTravelTimersEntity, SensorEntity):
         self, hass: HomeAssistant, entry: CoverTravelTimersConfigEntry
     ) -> None:
         """Set up the sensor."""
-        super().__init__(hass, entry, "phase", "Phase")
+        super().__init__(hass, entry, SENSOR_DOMAIN, "phase", "Phase")
         self._kind = entry.data[CONF_DEVICE_CLASS]  # garage or gate
 
     @property
