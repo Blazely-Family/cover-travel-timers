@@ -53,13 +53,13 @@ def _tunables_schema(values: dict[str, Any]) -> vol.Schema:
 
 USER_SCHEMA = vol.Schema(
     {
-        vol.Required(CONF_NAME): selector.TextSelector(),
         vol.Required(CONF_SOURCE): selector.EntitySelector(
             selector.EntitySelectorConfig(domain="cover")
         ),
         vol.Required(CONF_CONTACT): selector.EntitySelector(
             selector.EntitySelectorConfig(domain="binary_sensor")
         ),
+        vol.Optional(CONF_NAME): selector.TextSelector(),
         vol.Required(CONF_DEVICE_CLASS, default=CoverDeviceClass.GARAGE.value): (
             selector.SelectSelector(
                 selector.SelectSelectorConfig(
@@ -85,11 +85,18 @@ class CoverTravelTimersConfigFlow(ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             await self.async_set_unique_id(user_input[CONF_SOURCE])
             self._abort_if_unique_id_configured()
-            name = user_input.pop(CONF_NAME)
+            name = user_input.pop(CONF_NAME, "").strip() or self._default_name(
+                user_input[CONF_SOURCE]
+            )
             return self.async_create_entry(
                 title=name, data=user_input, options=dict(DEFAULTS)
             )
         return self.async_show_form(step_id="user", data_schema=USER_SCHEMA)
+
+    def _default_name(self, source: str) -> str:
+        """The pulse cover's name plus " Timer"."""
+        state = self.hass.states.get(source)
+        return f"{state.name if state else source} Timer"
 
     @staticmethod
     @callback

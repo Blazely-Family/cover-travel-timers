@@ -15,8 +15,8 @@ from custom_components.cover_travel_timers.const import (
 
 SOURCE = "cover.garage_controller"
 CONTACT = "binary_sensor.garage_contact"
-COVER = "cover.garage_travel"
-PHASE = "sensor.garage_travel_phase"
+COVER = "cover.garage_controller_timer"
+PHASE = "sensor.garage_controller_timer_phase"
 
 
 @pytest.fixture(autouse=True)

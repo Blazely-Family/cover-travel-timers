@@ -11,7 +11,7 @@
           "device_class": "Type"
         },
         "data_description": {
-          "name": "Pick a name that differs from the pulse cover's, so the entity ids don't clash.",
+          "name": "Optional. Leave empty for the pulse cover's name plus Timer. Entity ids always follow the pulse cover, for example cover.front_gate_timer.",
           "source_entity": "The cover whose open and close commands send the controller a pulse.",
           "closed_contact": "Off when the door is closed, on otherwise."
         }

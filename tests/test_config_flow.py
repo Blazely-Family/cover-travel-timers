@@ -43,7 +43,7 @@ async def test_user_flow(hass: HomeAssistant) -> None:
         CONF_DEVICE_CLASS: "garage",
     }
     assert result["options"] == DEFAULTS
-    assert hass.states.get("cover.garage_travel").state == "closed"
+    assert hass.states.get("cover.garage_controller_timer").state == "closed"
 
 
 async def test_options_flow(hass: HomeAssistant, entry) -> None:
@@ -58,3 +58,23 @@ async def test_options_flow(hass: HomeAssistant, entry) -> None:
     assert result["type"] is FlowResultType.CREATE_ENTRY
     assert entry.options == new
     assert entry.runtime_data.t_open == 14.6
+
+
+async def test_name_defaults_to_the_pulse_cover(hass: HomeAssistant) -> None:
+    """With no name, the door is the pulse cover's name plus " Timer"."""
+    hass.states.async_set(CONTACT, "off")
+    hass.states.async_set(SOURCE, "closed", {"friendly_name": "Garage controller"})
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": config_entries.SOURCE_USER}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        {CONF_SOURCE: SOURCE, CONF_CONTACT: CONTACT, CONF_DEVICE_CLASS: "gate"},
+    )
+    await hass.async_block_till_done()
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert result["title"] == "Garage controller Timer"
+    state = hass.states.get("cover.garage_controller_timer")
+    assert state.name == "Garage controller Timer"
+    phase = hass.states.get("sensor.garage_controller_timer_phase")
+    assert phase.name == "Garage controller Timer Phase"

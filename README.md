@@ -87,10 +87,10 @@ Copy `custom_components/cover_travel_timers` into your Home Assistant
 
 1. **Settings → Devices & services → Add integration → Cover Travel Timers.**
 2. Fill in:
-   - **Name**: for example "Lower Garage Door". Use a name that differs from
-     the pulse cover's, so the two covers are easy to tell apart.
    - **Pulse cover**: the controller's cover whose open/close sends a pulse.
    - **Closed contact**: the binary sensor that is off when the door is closed.
+   - **Name** (optional): leave it empty for the pulse cover's name plus
+     "Timer", for example "Front Gate Timer".
    - **Type**: garage door or gate.
 3. Set the timings, either on the controller's device page (the numbers under
    **Configuration**) or with the entry's **Configure** button. Both edit the
@@ -120,13 +120,22 @@ own helpers (such as *Change device type of a switch*) do, rather than creating
 a device of their own. If the pulse cover has no device, the entities have
 none either. Home Assistant shows the device's name in front of each entity's
 name, and drops the repeat when the door's name already starts with it. For
-example, a device "Lower Garage" with a door "Lower Garage Door" shows
-"Lower Garage Door" and "Lower Garage Door Phase".
+example, a device "Front Gate" with a door "Front Gate Timer" shows
+"Front Gate Timer" and "Front Gate Timer Phase".
 
-Entity ids come from the door's name alone, so they don't pick up the device's
-area or name: a door "Lower Garage Door" gets `cover.lower_garage_door`,
-`sensor.lower_garage_door_phase` and `number.lower_garage_door_full_open_time`
-and so on. An id you have already changed is kept.
+## Entity ids
+
+Entity ids follow the pulse cover's id plus `_timer`, whatever the door is
+called, so they never clash with the pulse cover:
+
+| Pulse cover | Cover | Phase | Timings |
+| --- | --- | --- | --- |
+| `cover.front_gate` | `cover.front_gate_timer` | `sensor.front_gate_timer_phase` | `number.front_gate_timer_full_open_time`, ... |
+
+The timing numbers end in `full_open_time`, `full_close_time`,
+`sensor_offset`, `motor_allowance`, `close_margin` and `closed_settle_time`.
+These are suggestions for new entities: an id already in Home Assistant's
+entity registry, including one you have renamed, is kept.
 
 Upgrading from 0.1.0 moves the existing entities to the pulse cover's device,
 keeps their entity ids, and removes the integration's old device.
