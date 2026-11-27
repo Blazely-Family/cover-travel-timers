@@ -1,0 +1,72 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Add a door",
+        "description": "A garage door or gate driven by single pulses, with a contact that only reports closed.",
+        "data": {
+          "name": "Name",
+          "source_entity": "Pulse cover",
+          "closed_contact": "Closed contact",
+          "device_class": "Type"
+        },
+        "data_description": {
+          "name": "Pick a name that differs from the pulse cover's, so the entity ids don't clash.",
+          "source_entity": "The cover whose open and close commands send the controller a pulse.",
+          "closed_contact": "Off when the door is closed, on otherwise."
+        }
+      }
+    },
+    "abort": {
+      "already_configured": "This pulse cover already has a door."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Timings",
+        "data": {
+          "full_open_time": "Full open time",
+          "full_close_time": "Full close time",
+          "sensor_offset": "Sensor offset",
+          "motor_allowance": "Motor allowance",
+          "close_margin": "Close margin",
+          "closed_settle_time": "Closed settle time"
+        },
+        "data_description": {
+          "full_open_time": "From a pulse at closed to fully open.",
+          "full_close_time": "From a pulse at fully open to the closed contact.",
+          "sensor_offset": "How far into an opening the closed contact lets go. An opening first seen from the contact (fob, app) starts this far in.",
+          "motor_allowance": "Added to a reverse back up after a stop on the way down (motor start and ease; nothing confirms the top).",
+          "close_margin": "Added to the full close time on every closing run before the door is called obstructed. Never delays closed.",
+          "closed_settle_time": "How long the contact must stay closed before the door counts as closed. 0 for most doors; raise it for a gate that reports closed while still tensioning."
+        }
+      }
+    }
+  },
+  "selector": {
+    "device_class": {
+      "options": {
+        "garage": "Garage door",
+        "gate": "Gate"
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "phase": {
+        "name": "Phase",
+        "state": {
+          "closed": "Closed",
+          "opening": "Opening",
+          "open": "Open",
+          "closing": "Closing",
+          "stopping": "Stopping",
+          "stopped_opening": "Stopped opening",
+          "stopped_closing": "Stopped closing",
+          "obstructed": "Obstructed"
+        }
+      }
+    }
+  }
+}
