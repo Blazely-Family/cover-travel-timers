@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 from typing import Any
 
 from homeassistant.components.cover import (
+    DOMAIN as COVER_DOMAIN,
     CoverDeviceClass,
     CoverEntity,
     CoverEntityFeature,
@@ -48,7 +49,7 @@ class CoverTravelTimersCover(CoverTravelTimersEntity, CoverEntity, RestoreEntity
         self, hass: HomeAssistant, entry: CoverTravelTimersConfigEntry
     ) -> None:
         """Set up the cover."""
-        super().__init__(hass, entry, "cover")
+        super().__init__(hass, entry, COVER_DOMAIN, "cover")
         self._attr_device_class = CoverDeviceClass(entry.data[CONF_DEVICE_CLASS])
         self._refresh: CALLBACK_TYPE | None = None
 
