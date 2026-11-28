@@ -28,6 +28,7 @@ async def async_setup_entry(
 class CoverTravelTimersPhaseSensor(CoverTravelTimersEntity, SensorEntity):
     """closed, opening, open, closing, stopping, stopped_*, obstructed."""
 
+    _names_sources = True
     _attr_device_class = SensorDeviceClass.ENUM
     _attr_options = [phase.value for phase in Phase]
     _attr_translation_key = "phase"

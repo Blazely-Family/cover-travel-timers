@@ -285,3 +285,129 @@ async def test_existing_ids_are_kept(
     await hass.async_block_till_done()
     assert hass.states.get("number.my_open_time") is not None
     assert hass.states.get("number.garage_controller_timer_full_open_time") is None
+
+
+async def test_timer_names_its_cover_and_contact(
+    hass: HomeAssistant, entry: MockConfigEntry
+) -> None:
+    """The cover and phase sensor say which pulse cover and contact they follow."""
+    await setup_door(hass, entry, "off")
+    for entity_id in (COVER, PHASE):
+        attributes = hass.states.get(entity_id).attributes
+        assert attributes["source_cover"] == SOURCE
+        assert attributes["closed_contact"] == CONTACT
+    # The timing numbers stay plain.
+    assert "source_cover" not in hass.states.get(NUMBERS[0]).attributes
+
+
+async def test_source_attributes_are_not_recorded(
+    hass: HomeAssistant, entry: MockConfigEntry
+) -> None:
+    """The names never change, so the recorder leaves them out."""
+    await setup_door(hass, entry, "off")
+    for platform in ("cover", "sensor"):
+        entity = next(
+            e
+            for e in hass.data["entity_components"][platform].entities
+            if e.entity_id in (COVER, PHASE)
+        )
+        assert {"source_cover", "closed_contact"} <= entity._unrecorded_attributes
+
+
+def _controller(hass: HomeAssistant, key: str, name: str) -> dr.DeviceEntry:
+    """A pulse cover cover.<key> on a device of its own integration."""
+    controller = MockConfigEntry(domain="test")
+    controller.add_to_hass(hass)
+    device = dr.async_get(hass).async_get_or_create(
+        config_entry_id=controller.entry_id,
+        identifiers={("test", key)},
+        name=name,
+    )
+    er.async_get(hass).async_get_or_create(
+        "cover",
+        "test",
+        key,
+        suggested_object_id=key,
+        config_entry=controller,
+        device_id=device.id,
+    )
+    return device
+
+
+async def test_configure_repoints_to_another_cover(
+    hass: HomeAssistant, entry: MockConfigEntry, source_device: dr.DeviceEntry
+) -> None:
+    """A new pulse cover and contact in Configure: entities move, ids stay."""
+    other = _controller(hass, "other_door", "Other door")
+    await setup_door(hass, entry, "off")
+    hass.states.async_set("binary_sensor.other_contact", "on")
+
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        {
+            CONF_SOURCE: "cover.other_door",
+            CONF_CONTACT: "binary_sensor.other_contact",
+            **DEFAULTS,
+        },
+    )
+    await hass.async_block_till_done()
+
+    assert entry.data[CONF_SOURCE] == "cover.other_door"
+    assert entry.data[CONF_CONTACT] == "binary_sensor.other_contact"
+    assert entry.unique_id == "cover.other_door"
+    entities = our_entities(hass, entry)
+    assert len(entities) == 8
+    assert {e.device_id for e in entities} == {other.id}
+    # Ids stay as they were; the attributes name the new sources.
+    attributes = hass.states.get(COVER).attributes
+    assert attributes["source_cover"] == "cover.other_door"
+    assert attributes["closed_contact"] == "binary_sensor.other_contact"
+    # Now following the new contact (open), and pulses on the new cover.
+    assert hass.states.get(PHASE).state == "open"
+    await hass.services.async_call(
+        "cover", "close_cover", {"entity_id": "cover.other_door"}, blocking=True
+    )
+    await hass.async_block_till_done()
+    assert hass.states.get(PHASE).state == "closing"
+
+
+async def test_configure_refuses_a_cover_with_a_door(
+    hass: HomeAssistant, entry: MockConfigEntry
+) -> None:
+    """Another door's pulse cover can't be picked."""
+    taken = MockConfigEntry(
+        domain=DOMAIN,
+        version=2,
+        unique_id="cover.taken",
+        data={
+            CONF_SOURCE: "cover.taken",
+            CONF_CONTACT: "binary_sensor.taken",
+            CONF_DEVICE_CLASS: "garage",
+        },
+    )
+    taken.add_to_hass(hass)
+    await setup_door(hass, entry, "off")
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        {CONF_SOURCE: "cover.taken", CONF_CONTACT: CONTACT, **DEFAULTS},
+    )
+    assert result["errors"] == {CONF_SOURCE: "already_configured"}
+    assert entry.data[CONF_SOURCE] == SOURCE
+
+
+async def test_pulse_cover_picker_leaves_out_timers(
+    hass: HomeAssistant, entry: MockConfigEntry
+) -> None:
+    """Timed covers from this integration aren't offered as pulse covers."""
+    await setup_door(hass, entry, "off")
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    for key in result["data_schema"].schema:
+        if key == CONF_SOURCE:
+            picker = result["data_schema"].schema[key]
+            assert COVER in picker.config["exclude_entities"]
+            assert key.default() == SOURCE
+            break
+    else:
+        raise AssertionError("no pulse cover picker")

@@ -44,6 +44,10 @@ TUNABLES = (
 )
 TUNABLE_STEP = 0.1
 
+# State attributes naming the entities a door is tied to.
+ATTR_SOURCE_COVER = "source_cover"
+ATTR_CLOSED_CONTACT = "closed_contact"
+
 # After a stop the controller ignores a pulse sent straight away, so the
 # door is left to settle this long before the next pulse counts.
 STOP_SETTLE = 2.0

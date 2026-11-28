@@ -7,7 +7,7 @@ from homeassistant.core import HomeAssistant, split_entity_id
 from homeassistant.helpers.device import async_entity_id_to_device
 from homeassistant.helpers.entity import Entity
 
-from .const import CONF_SOURCE
+from .const import ATTR_CLOSED_CONTACT, ATTR_SOURCE_COVER, CONF_CONTACT, CONF_SOURCE
 from .tracker import DoorTracker
 
 
@@ -27,6 +27,9 @@ class CoverTravelTimersEntity(Entity):
     """
 
     _attr_has_entity_name = False
+    # Set by subclasses that name the pulse cover and closed contact.
+    _names_sources = False
+    _unrecorded_attributes = frozenset({ATTR_SOURCE_COVER, ATTR_CLOSED_CONTACT})
     _attr_should_poll = False
 
     def __init__(
@@ -47,6 +50,13 @@ class CoverTravelTimersEntity(Entity):
         )
         self.entity_id = f"{domain}.{object_id}"
         self.device_entry = async_entity_id_to_device(hass, entry.data[CONF_SOURCE])
+        if self._names_sources:
+            # Which cover and contact this door is tied to. They never change,
+            # so they are left out of the recorder.
+            self._attr_extra_state_attributes = {
+                ATTR_SOURCE_COVER: entry.data[CONF_SOURCE],
+                ATTR_CLOSED_CONTACT: entry.data[CONF_CONTACT],
+            }
 
     async def async_added_to_hass(self) -> None:
         """Update whenever the door's phase, position or timings change."""

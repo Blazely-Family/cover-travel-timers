@@ -140,6 +140,19 @@ entity registry, including one you have renamed, is kept.
 Upgrading from 0.1.0 moves the existing entities to the pulse cover's device,
 keeps their entity ids, and removes the integration's old device.
 
+## Which cover a timer follows
+
+The timed cover and the phase sensor carry two attributes, `source_cover` and
+`closed_contact`, naming the pulse cover and closed contact they follow. They
+never change, so the recorder leaves them out.
+
+To point a door at another cover or contact, open the entry's **Configure**:
+the pulse cover and closed contact are at the top, above the timings (the
+picker leaves out the timed covers themselves). Saving a new one reloads the
+door and moves its entities to the new pulse cover's device. Their entity ids
+stay as they are, even though they were named after the old cover; rename
+them yourself if you want them to match. Saving only timings doesn't reload.
+
 ## Development
 
 Tests use `pytest-homeassistant-custom-component` and run in CI on Linux:
