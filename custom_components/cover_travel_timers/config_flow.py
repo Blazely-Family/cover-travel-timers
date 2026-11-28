@@ -101,7 +101,7 @@ def _user_schema(hass: HomeAssistant) -> vol.Schema:
 class CoverTravelTimersConfigFlow(ConfigFlow, domain=DOMAIN):
     """Add a door."""
 
-    VERSION = 2  # 2: entities live on the pulse cover's device
+    VERSION = 3  # 3: each door has its own device, via the pulse cover's
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None

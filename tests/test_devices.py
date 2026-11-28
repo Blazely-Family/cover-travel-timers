@@ -56,31 +56,41 @@ def our_entities(hass: HomeAssistant, entry: MockConfigEntry) -> list[er.Registr
     return er.async_entries_for_config_entry(er.async_get(hass), entry.entry_id)
 
 
-async def test_entities_join_the_pulse_cover_device(
+def door_device(hass: HomeAssistant, entry: MockConfigEntry) -> dr.DeviceEntry:
+    [device] = dr.async_entries_for_config_entry(dr.async_get(hass), entry.entry_id)
+    assert device.identifiers == {(DOMAIN, entry.entry_id)}
+    return device
+
+
+async def test_door_has_its_own_device(
     hass: HomeAssistant, entry: MockConfigEntry, source_device: dr.DeviceEntry
 ) -> None:
-    """Every entity sits on the pulse cover's device; no device of our own."""
+    """A device per door, connected via the pulse cover's, holding all 8 entities."""
     await setup_door(hass, entry, "off")
 
+    device = door_device(hass, entry)
+    assert device.name == "Garage Travel"
+    assert device.manufacturer == "Cover Travel Timers"
+    assert device.model == "Garage door timer"
+    assert device.via_device_id == source_device.id
     entities = our_entities(hass, entry)
     assert len(entities) == 8  # cover, phase, six timings
-    assert {e.device_id for e in entities} == {source_device.id}
-    # The id follows the door's name; HA puts the device name in front of the name.
-    cover = next(e for e in entities if e.domain == "cover")
-    assert cover.entity_id == COVER
-    assert hass.states.get(cover.entity_id).name == "Garage controller Garage Travel"
-    assert not dr.async_entries_for_config_entry(dr.async_get(hass), entry.entry_id)
-    # The pulse cover's device is still only the controller's.
+    assert {e.device_id for e in entities} == {device.id}
+    assert hass.states.get(COVER).name == "Garage Travel"
+    assert hass.states.get(PHASE).name == "Garage Travel Phase"
+    assert hass.states.get(NUMBERS[0]).name == "Garage Travel Full open time"
+    # The pulse cover's device is left alone.
     assert dr.async_get(hass).async_get(source_device.id).name == "Garage controller"
 
 
-async def test_no_source_device_means_no_device(
+async def test_no_source_device_means_no_via(
     hass: HomeAssistant, entry: MockConfigEntry
 ) -> None:
-    """A pulse cover without a device: the entities have none either."""
+    """A pulse cover without a device: the door's device stands alone."""
     await setup_door(hass, entry, "off")
-    assert {e.device_id for e in our_entities(hass, entry)} == {None}
-    assert not dr.async_entries_for_config_entry(dr.async_get(hass), entry.entry_id)
+    device = door_device(hass, entry)
+    assert device.via_device_id is None
+    assert {e.device_id for e in our_entities(hass, entry)} == {device.id}
 
 
 async def test_numbers_show_the_options(
@@ -142,76 +152,86 @@ async def test_configure_updates_the_number(
     )
 
 
-async def test_migrate_from_own_device(
-    hass: HomeAssistant, source_device: dr.DeviceEntry
-) -> None:
-    """Version 1: entities move to the pulse cover's device, ids kept, old device gone."""
+def _old_entry(
+    hass: HomeAssistant, version: int, device_id_for
+) -> tuple[MockConfigEntry, dr.DeviceEntry | None]:
+    """An entry of an earlier version with its cover and phase registered."""
     entry = MockConfigEntry(
         domain=DOMAIN,
-        version=1,
+        version=version,
         title="Garage Travel",
         unique_id=SOURCE,
         data={CONF_SOURCE: SOURCE, CONF_CONTACT: CONTACT, CONF_DEVICE_CLASS: "garage"},
         options=dict(DEFAULTS),
     )
     entry.add_to_hass(hass)
-    device_reg = dr.async_get(hass)
-    entity_reg = er.async_get(hass)
-    old = device_reg.async_get_or_create(
-        config_entry_id=entry.entry_id,
-        identifiers={(DOMAIN, entry.entry_id)},
-        name="Garage Travel",
-    )
+    own = None
+    if version == 1:
+        own = dr.async_get(hass).async_get_or_create(
+            config_entry_id=entry.entry_id,
+            identifiers={(DOMAIN, entry.entry_id)},
+            name="Garage Travel",
+        )
     for domain, key, object_id in (
         ("cover", "cover", "garage_controller_timer"),
         ("sensor", "phase", "garage_controller_timer_phase"),
     ):
-        entity_reg.async_get_or_create(
+        er.async_get(hass).async_get_or_create(
             domain,
             DOMAIN,
             f"{entry.entry_id}_{key}",
             suggested_object_id=object_id,
             config_entry=entry,
-            device_id=old.id,
+            device_id=device_id_for(own),
         )
+    return entry, own
 
+
+async def _set_up(hass: HomeAssistant, entry: MockConfigEntry) -> None:
     hass.states.async_set(CONTACT, "off")
     assert await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
 
-    assert entry.version == 2
-    assert device_reg.async_get(old.id) is None
-    assert not dr.async_entries_for_config_entry(device_reg, entry.entry_id)
-    for entity_id in (COVER, PHASE):
-        assert entity_reg.async_get(entity_id).device_id == source_device.id
-    assert hass.states.get(COVER).state == "closed"
-    assert hass.states.get(PHASE).state == "closed"
+
+async def test_migrate_from_version_1(
+    hass: HomeAssistant, source_device: dr.DeviceEntry
+) -> None:
+    """Version 1 had its own device: it stays, now connected via the controller."""
+    entry, own = _old_entry(hass, 1, lambda own: own.id)
+    await _set_up(hass, entry)
+
+    assert entry.version == 3
+    device = door_device(hass, entry)
+    assert device.id == own.id
+    assert device.via_device_id == source_device.id
+    assert dr.async_entries_for_config_entry(dr.async_get(hass), entry.entry_id) == [
+        device
+    ]
+    assert {e.device_id for e in our_entities(hass, entry)} == {device.id}
     assert len(our_entities(hass, entry)) == 8
 
 
-async def test_title_starting_with_the_device_name(
-    hass: HomeAssistant, entry: MockConfigEntry
+async def test_migrate_from_version_2(
+    hass: HomeAssistant, source_device: dr.DeviceEntry
 ) -> None:
-    """A title that starts with the device's name isn't doubled up."""
-    controller = MockConfigEntry(domain="test")
-    controller.add_to_hass(hass)
-    device = dr.async_get(hass).async_get_or_create(
-        config_entry_id=controller.entry_id,
-        identifiers={("test", "garage")},
-        name="Garage",
+    """Version 2 put the entities on the controller's device: they move off it."""
+    entry, _ = _old_entry(hass, 2, lambda own: source_device.id)
+    await _set_up(hass, entry)
+
+    assert entry.version == 3
+    device = door_device(hass, entry)
+    assert device.via_device_id == source_device.id
+    entity_reg = er.async_get(hass)
+    for entity_id in (COVER, PHASE):  # ids kept
+        assert entity_reg.async_get(entity_id).device_id == device.id
+    assert not er.async_entries_for_device(entity_reg, source_device.id) or all(
+        e.config_entry_id != entry.entry_id
+        for e in er.async_entries_for_device(entity_reg, source_device.id)
     )
-    er.async_get(hass).async_get_or_create(
-        "cover",
-        "test",
-        "garage",
-        suggested_object_id="garage_controller",
-        config_entry=controller,
-        device_id=device.id,
+    assert (
+        len(dr.async_entries_for_config_entry(dr.async_get(hass), entry.entry_id)) == 1
     )
-    await setup_door(hass, entry, "off")
-    assert hass.states.get(COVER).name == "Garage Travel"
-    assert hass.states.get(PHASE).name == "Garage Travel Phase"
-    assert hass.states.get(NUMBERS[0]).name == "Garage Travel Full open time"
+    assert hass.states.get(COVER).state == "closed"
 
 
 async def test_new_ids_follow_the_pulse_cover(hass: HomeAssistant) -> None:
@@ -240,7 +260,7 @@ async def test_new_ids_follow_the_pulse_cover(hass: HomeAssistant) -> None:
     )
     entry = MockConfigEntry(
         domain=DOMAIN,
-        version=2,
+        version=3,
         title="Lower Garage Door",
         unique_id="cover.lower_garage",
         data={
@@ -266,6 +286,8 @@ async def test_new_ids_follow_the_pulse_cover(hass: HomeAssistant) -> None:
     )
     state = hass.states.get("number.lower_garage_timer_full_open_time")
     assert state.name == "Lower Garage Door Full open time"
+    # The door's device starts in the controller's area.
+    assert door_device(hass, entry).area_id == area.id
 
 
 async def test_existing_ids_are_kept(
@@ -358,7 +380,9 @@ async def test_configure_repoints_to_another_cover(
     assert entry.unique_id == "cover.other_door"
     entities = our_entities(hass, entry)
     assert len(entities) == 8
-    assert {e.device_id for e in entities} == {other.id}
+    device = door_device(hass, entry)
+    assert {e.device_id for e in entities} == {device.id}
+    assert device.via_device_id == other.id
     # Ids stay as they were; the attributes name the new sources.
     attributes = hass.states.get(COVER).attributes
     assert attributes["source_cover"] == "cover.other_door"
@@ -378,7 +402,7 @@ async def test_configure_refuses_a_cover_with_a_door(
     """Another door's pulse cover can't be picked."""
     taken = MockConfigEntry(
         domain=DOMAIN,
-        version=2,
+        version=3,
         unique_id="cover.taken",
         data={
             CONF_SOURCE: "cover.taken",
