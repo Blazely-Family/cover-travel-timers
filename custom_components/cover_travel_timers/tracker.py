@@ -160,6 +160,22 @@ class DoorTracker:
         elif self.phase == Phase.CLOSING:
             await self._send(SERVICE_CLOSE_COVER)
 
+    async def async_toggle(self) -> None:
+        """One pulse, like the controller's own button: whatever it does next.
+
+        Moving: stop. Closed, obstructed or stopped on the way down: up.
+        Open or stopped on the way up: down. Settling after a stop: nothing.
+        """
+        if self.phase in (
+            Phase.OPENING,
+            Phase.CLOSED,
+            Phase.OBSTRUCTED,
+            Phase.STOPPED_CLOSING,
+        ):
+            await self._send(SERVICE_OPEN_COVER)
+        elif self.phase in (Phase.CLOSING, Phase.OPEN, Phase.STOPPED_OPENING):
+            await self._send(SERVICE_CLOSE_COVER)
+
     async def _send(self, service: str) -> None:
         # The call_service event this fires is what moves the state machine,
         # the same as a call from anywhere else.

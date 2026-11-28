@@ -261,3 +261,33 @@ async def test_restore_mid_run(hass, entry, pulses) -> None:
     await setup_door(hass, entry, "on")
     assert phase(hass) == "open"
     assert cover(hass).attributes.get("current_position") is None
+
+
+async def test_toggle_is_one_pulse(hass, entry, pulses, freezer) -> None:
+    """Tapping toggle steps through close, stop, reverse, like the wall button."""
+    await setup_door(hass, entry, "on")
+    await press(hass, "toggle")  # open -> close
+    assert phase(hass) == "closing"
+    assert len(pulses["close"]) == 1
+
+    await tick(hass, freezer, 5)
+    await press(hass, "toggle")  # moving -> stop, same direction
+    assert phase(hass) == "stopping"
+    assert len(pulses["close"]) == 2
+
+    await press(hass, "toggle")  # settling: nothing
+    assert len(pulses["open"]) == 0 and len(pulses["close"]) == 2
+
+    await tick(hass, freezer, 2)
+    assert phase(hass) == "stopped_closing"
+    await press(hass, "toggle")  # stopped on the way down -> back up
+    assert phase(hass) == "opening"
+    assert len(pulses["open"]) == 1
+
+
+async def test_toggle_from_closed(hass, entry, pulses, freezer) -> None:
+    """Closed: toggle opens."""
+    await setup_door(hass, entry, "off")
+    await press(hass, "toggle")
+    assert phase(hass) == "opening"
+    assert len(pulses["open"]) == 1

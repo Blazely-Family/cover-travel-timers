@@ -105,6 +105,15 @@ class CoverTravelTimersCover(CoverTravelTimersEntity, CoverEntity, RestoreEntity
         """Stop."""
         await self.tracker.async_stop()
 
+    async def async_toggle(self, **kwargs: Any) -> None:
+        """One pulse, whatever the door does next (a tap on a dashboard button).
+
+        Home Assistant's default toggle sends Close after a stop on the way
+        down, which this cover ignores (the next pulse goes up), so a tap
+        would do nothing.
+        """
+        await self.tracker.async_toggle()
+
     @callback
     def _moving_refresh(self) -> None:
         """Keep the position current while the door moves."""
