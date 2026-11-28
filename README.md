@@ -64,6 +64,9 @@ them as they are.
 - **Stop**: many controllers ignore a cover stop, so the cover's Stop sends a
   pulse in the direction of travel. Open and Close only send a pulse when that
   pulse would move the door the way you asked.
+- **Toggle** (a tap on a dashboard button) sends exactly one pulse, like the
+  controller's own button: stop if moving, otherwise whatever the door does
+  next (back up after a stop on the way down).
 - **Timing** is sub-second; nothing is rounded to whole seconds.
 - **After a restart** the contact is trusted first: closed if it is closed.
   Otherwise a door at rest keeps its last phase and position, a door that was
