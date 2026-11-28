@@ -12,9 +12,9 @@ Timers follows the door from what is known for sure:
 - the closed contact (a `binary_sensor` that is off when the door is closed)
 - a handful of timings you tune in the UI
 
-For each door it adds a **cover** with a position and opening/closing states, a
-**phase** sensor, and a **number** for each timing, all on the controller's own
-device.
+For each door it adds a device of its own holding a **cover** with a position
+and opening/closing states, a **phase** sensor, and a **number** for each
+timing.
 
 ## When to use this vs your door integration's own travel timers
 
@@ -92,7 +92,7 @@ Copy `custom_components/cover_travel_timers` into your Home Assistant
    - **Name** (optional): leave it empty for the pulse cover's name plus
      "Timer", for example "Front Gate Timer".
    - **Type**: garage door or gate.
-3. Set the timings, either on the controller's device page (the numbers under
+3. Set the timings, either on the door's device page (the numbers under
    **Configuration**) or with the entry's **Configure** button. Both edit the
    same values:
 
@@ -115,13 +115,18 @@ Add one entry per door.
 
 ## Device
 
-The entities join the pulse cover's existing device, the way Home Assistant's
-own helpers (such as *Change device type of a switch*) do, rather than creating
-a device of their own. If the pulse cover has no device, the entities have
-none either. Home Assistant shows the device's name in front of each entity's
-name, and drops the repeat when the door's name already starts with it. For
-example, a device "Front Gate" with a door "Front Gate Timer" shows
-"Front Gate Timer" and "Front Gate Timer Phase".
+Each door is a device of its own, named after the entry (for example "Front
+Gate Timer"), with the cover, the phase sensor and the six timing numbers on
+it. Open it from **Settings → Devices & services → Cover Travel Timers** to see
+everything for that door in one place.
+
+When the pulse cover belongs to a device, the door's device is connected via
+it, so its page shows "Connected via" the controller, and it starts in the
+controller's area (change the area if you like; yours is kept). If the pulse
+cover has no device, the door's device stands alone.
+
+Upgrading from 0.2.0 to 0.3.1 (when the entities sat on the controller's
+device) moves them onto the door's own device and keeps their entity ids.
 
 ## Entity ids
 
@@ -137,8 +142,19 @@ The timing numbers end in `full_open_time`, `full_close_time`,
 These are suggestions for new entities: an id already in Home Assistant's
 entity registry, including one you have renamed, is kept.
 
-Upgrading from 0.1.0 moves the existing entities to the pulse cover's device,
-keeps their entity ids, and removes the integration's old device.
+
+## Which cover a timer follows
+
+The timed cover and the phase sensor carry two attributes, `source_cover` and
+`closed_contact`, naming the pulse cover and closed contact they follow. They
+never change, so the recorder leaves them out.
+
+To point a door at another cover or contact, open the entry's **Configure**:
+the pulse cover and closed contact are at the top, above the timings (the
+picker leaves out the timed covers themselves). Saving a new one reloads the
+door and connects its device via the new pulse cover's device. The entity ids
+stay as they are, even though they were named after the old cover; rename
+them yourself if you want them to match. Saving only timings doesn't reload.
 
 ## Development
 

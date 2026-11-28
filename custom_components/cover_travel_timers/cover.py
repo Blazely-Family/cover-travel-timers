@@ -41,6 +41,7 @@ async def async_setup_entry(
 class CoverTravelTimersCover(CoverTravelTimersEntity, CoverEntity, RestoreEntity):
     """Open/close/stop sent as pulses; position from the tracker."""
 
+    _names_sources = True
     _attr_supported_features = (
         CoverEntityFeature.OPEN | CoverEntityFeature.CLOSE | CoverEntityFeature.STOP
     )

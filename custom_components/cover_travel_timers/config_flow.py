@@ -14,8 +14,8 @@ from homeassistant.config_entries import (
     OptionsFlow,
 )
 from homeassistant.const import CONF_DEVICE_CLASS, CONF_NAME, UnitOfTime
-from homeassistant.core import callback
-from homeassistant.helpers import selector
+from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers import entity_registry as er, selector
 
 from .const import (
     CONF_CONTACT,
@@ -51,32 +51,57 @@ def _tunables_schema(values: dict[str, Any]) -> vol.Schema:
     )
 
 
-USER_SCHEMA = vol.Schema(
-    {
-        vol.Required(CONF_SOURCE): selector.EntitySelector(
-            selector.EntitySelectorConfig(domain="cover")
-        ),
-        vol.Required(CONF_CONTACT): selector.EntitySelector(
-            selector.EntitySelectorConfig(domain="binary_sensor")
-        ),
-        vol.Optional(CONF_NAME): selector.TextSelector(),
-        vol.Required(CONF_DEVICE_CLASS, default=CoverDeviceClass.GARAGE.value): (
-            selector.SelectSelector(
-                selector.SelectSelectorConfig(
-                    options=DEVICE_CLASSES,
-                    translation_key=CONF_DEVICE_CLASS,
-                    mode=selector.SelectSelectorMode.LIST,
+def _sources_schema(
+    hass: HomeAssistant, source: str | None = None, contact: str | None = None
+) -> dict[vol.Marker, Any]:
+    """Pickers for the pulse cover and closed contact (defaults when editing).
+
+    The pulse-cover picker leaves out this integration's own timed covers: a
+    timer can't drive another timer.
+    """
+    own_covers = [
+        e.entity_id
+        for e in er.async_get(hass).entities.values()
+        if e.platform == DOMAIN and e.domain == "cover"
+    ]
+    return {
+        vol.Required(CONF_SOURCE, default=source or vol.UNDEFINED): (
+            selector.EntitySelector(
+                selector.EntitySelectorConfig(
+                    domain="cover", exclude_entities=own_covers
                 )
             )
         ),
+        vol.Required(CONF_CONTACT, default=contact or vol.UNDEFINED): (
+            selector.EntitySelector(
+                selector.EntitySelectorConfig(domain="binary_sensor")
+            )
+        ),
     }
-)
+
+
+def _user_schema(hass: HomeAssistant) -> vol.Schema:
+    return vol.Schema(
+        {
+            **_sources_schema(hass),
+            vol.Optional(CONF_NAME): selector.TextSelector(),
+            vol.Required(CONF_DEVICE_CLASS, default=CoverDeviceClass.GARAGE.value): (
+                selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=DEVICE_CLASSES,
+                        translation_key=CONF_DEVICE_CLASS,
+                        mode=selector.SelectSelectorMode.LIST,
+                    )
+                )
+            ),
+        }
+    )
 
 
 class CoverTravelTimersConfigFlow(ConfigFlow, domain=DOMAIN):
     """Add a door."""
 
-    VERSION = 2  # 2: entities live on the pulse cover's device
+    VERSION = 3  # 3: each door has its own device, via the pulse cover's
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
@@ -91,7 +116,7 @@ class CoverTravelTimersConfigFlow(ConfigFlow, domain=DOMAIN):
             return self.async_create_entry(
                 title=name, data=user_input, options=dict(DEFAULTS)
             )
-        return self.async_show_form(step_id="user", data_schema=USER_SCHEMA)
+        return self.async_show_form(step_id="user", data_schema=_user_schema(self.hass))
 
     def _default_name(self, source: str) -> str:
         """The pulse cover's name plus " Timer"."""
@@ -108,15 +133,54 @@ class CoverTravelTimersConfigFlow(ConfigFlow, domain=DOMAIN):
 
 
 class CoverTravelTimersOptionsFlow(OptionsFlow):
-    """The door's timings, in seconds."""
+    """The door's pulse cover, closed contact and timings."""
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Show and save the tunables."""
+        """Show and save the sources and timings.
+
+        Timings alone apply live from the next run. A new pulse cover or
+        contact is saved to the entry and the entry reloads, which moves the
+        entities to the new pulse cover's device; entity ids are kept.
+        """
+        entry = self.config_entry
+        errors: dict[str, str] = {}
         if user_input is not None:
-            return self.async_create_entry(data=user_input)
+            source = user_input.pop(CONF_SOURCE)
+            contact = user_input.pop(CONF_CONTACT)
+            changed = (source, contact) != (
+                entry.data[CONF_SOURCE],
+                entry.data[CONF_CONTACT],
+            )
+            other = self.hass.config_entries.async_entry_for_domain_unique_id(
+                DOMAIN, source
+            )
+            if other is not None and other.entry_id != entry.entry_id:
+                errors[CONF_SOURCE] = "already_configured"
+            elif changed:
+                self.hass.config_entries.async_update_entry(
+                    entry,
+                    data={**entry.data, CONF_SOURCE: source, CONF_CONTACT: contact},
+                    options=user_input,
+                    unique_id=source,
+                )
+                self.hass.config_entries.async_schedule_reload(entry.entry_id)
+                return self.async_create_entry(data=user_input)
+            else:
+                return self.async_create_entry(data=user_input)
+            values = {**user_input, CONF_SOURCE: source, CONF_CONTACT: contact}
+        else:
+            values = {**entry.data, **entry.options}
         return self.async_show_form(
             step_id="init",
-            data_schema=_tunables_schema(dict(self.config_entry.options)),
+            data_schema=vol.Schema(
+                {
+                    **_sources_schema(
+                        self.hass, values[CONF_SOURCE], values[CONF_CONTACT]
+                    ),
+                    **_tunables_schema(values).schema,
+                }
+            ),
+            errors=errors,
         )

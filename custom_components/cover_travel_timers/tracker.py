@@ -92,6 +92,8 @@ class DoorTracker:
         self._run_timer: CALLBACK_TYPE | None = None
         self._settle_timer: CALLBACK_TYPE | None = None
         self._listeners: list[Callable[[], None]] = []
+        # The door's own device, set at setup.
+        self.device_id: str | None = None
 
     # Tunables, read live so option changes apply to the next run.
 

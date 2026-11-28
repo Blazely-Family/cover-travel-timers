@@ -24,8 +24,10 @@
   "options": {
     "step": {
       "init": {
-        "title": "Timings",
+        "title": "Pulse cover, contact and timings",
         "data": {
+          "source_entity": "Pulse cover",
+          "closed_contact": "Closed contact",
           "full_open_time": "Full open time",
           "full_close_time": "Full close time",
           "sensor_offset": "Sensor offset",
@@ -34,6 +36,8 @@
           "closed_settle_time": "Closed settle time"
         },
         "data_description": {
+          "source_entity": "The cover whose open and close commands send the controller a pulse. Changing it moves this door's entities to that cover's device; their entity ids stay as they are.",
+          "closed_contact": "Off when the door is closed, on otherwise.",
           "full_open_time": "From a pulse at closed to fully open.",
           "full_close_time": "From a pulse at fully open to the closed contact.",
           "sensor_offset": "How far into an opening the closed contact lets go. An opening first seen from the contact (fob, app) starts this far in.",
@@ -42,6 +46,9 @@
           "closed_settle_time": "How long the contact must stay closed before the door counts as closed. 0 for most doors; raise it for a gate that reports closed while still tensioning."
         }
       }
+    },
+    "error": {
+      "already_configured": "That pulse cover already has a door."
     }
   },
   "selector": {
